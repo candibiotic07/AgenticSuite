@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AgenticSuite{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1><i class="fas fa-robot"></i> AgenticSuite Dashboard</h1>
+        <p class="dashboard-subtitle">AI-Powered Automation Platform</p>
+    </div>
+
+    {% if not auth_status %}
+    <div class="auth-required">
+        <div class="auth-card">
+            <i class="fas fa-lock fa-3x"></i>
+            <h2>Authentication Required</h2>
+            <p>Please authenticate with Google to access your AI agents.</p>
+            <a href="{{ url_for('auth_page') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-sign-in-alt"></i> Authenticate Now
+            </a>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="agent-cards">
+        <!-- Email Agent Card -->
+        <div class="agent-card {% if not email_available %}disabled{% endif %}">
+            <div class="agent-icon">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <div class="agent-content">
+                <h3>Email Agent</h3>
+                <p>Intelligent email automation with AI classification, meeting scheduling, and template responses.</p>
+                <div class="agent-features">
+                    <span class="feature-tag"><i class="fas fa-brain"></i> AI Classification</span>
+                    <span class="feature-tag"><i class="fas fa-calendar"></i> Auto Scheduling</span>
+                    <span class="feature-tag"><i class="fas fa-reply"></i> Smart Responses</span>
+                </div>
+                {% if email_available %}
+                <a href="{{ url_for('email_dashboard') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> Launch Email Agent
+                </a>
+                {% else %}
+                <button class="btn btn-secondary" disabled>
+                    <i class="fas fa-exclamation-triangle"></i> Not Available
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Meeting Agent Card -->
+        <div class="agent-card {% if not meeting_available %}disabled{% endif %}">
+            <div class="agent-icon">
+                <i class="fas fa-video"></i>
+            </div>
+            <div class="agent-content">
+                <h3>Meeting Agent</h3>
+                <p>Transform Google Meet recordings into AI-generated notes, summaries, and action items.</p>
+                <div class="agent-features">
+                    <span class="feature-tag"><i class="fas fa-microphone"></i> Transcript Processing</span>
+                    <span class="feature-tag"><i class="fas fa-file-alt"></i> AI Summaries</span>
+                    <span class="feature-tag"><i class="fas fa-share"></i> Auto Distribution</span>
+                </div>
+                {% if meeting_available %}
+                <a href="{{ url_for('meeting_dashboard') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> Launch Meeting Agent
+                </a>
+                {% else %}
+                <button class="btn btn-secondary" disabled>
+                    <i class="fas fa-exclamation-triangle"></i> Not Available
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Contract Agent Card -->
+        <div class="agent-card {% if not contract_available %}disabled{% endif %}">
+            <div class="agent-icon">
+                <i class="fas fa-file-contract"></i>
+            </div>
+            <div class="agent-content">
+                <h3>Contract Agent</h3>
+                <p>Advanced contract analysis with risk detection, clause extraction, and compliance checking.</p>
+                <div class="agent-features">
+                    <span class="feature-tag"><i class="fas fa-search"></i> Risk Detection</span>
+                    <span class="feature-tag"><i class="fas fa-shield-alt"></i> Compliance Check</span>
+                    <span class="feature-tag"><i class="fas fa-chart-line"></i> Analytics</span>
+                </div>
+                {% if contract_available %}
+                <a href="{{ url_for('contract_dashboard') }}" class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> Launch Contract Agent
+                </a>
+                {% else %}
+                <button class="btn btn-secondary" disabled>
+                    <i class="fas fa-exclamation-triangle"></i> Not Available
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+        <h2><i class="fas fa-chart-bar"></i> Quick Stats</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-envelope-open-text"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalEmails">-</h3>
+                    <p>Total Emails Processed</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="meetingsScheduled">-</h3>
+                    <p>Meetings Scheduled</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="responsesGenerated">-</h3>
+                    <p>Responses Generated</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="acceptanceRate">-</h3>
+                    <p>Acceptance Rate</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-file-signature"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="contractsAnalyzed">-</h3>
+                    <p>Contracts Analyzed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Features Overview -->
+    <div class="agent-features-overview">
+        <h2><i class="fas fa-star"></i> Agent Features & Capabilities</h2>
+        
+        <!-- Email Agent Features -->
+        <div class="agent-features-section">
+            <h3><i class="fas fa-envelope"></i> Email Agent Features</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <i class="fas fa-brain"></i>
+                    <h4>AI Classification</h4>
+                    <p>Automatically categorizes emails using advanced AI</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-calendar"></i>
+                    <h4>Smart Scheduling</h4>
+                    <p>Finds optimal meeting times and creates calendar events</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-template"></i>
+                    <h4>Template Responses</h4>
+                    <p>Generates contextual responses for common email types</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-user-check"></i>
+                    <h4>Human Approval</h4>
+                    <p>All actions require your approval before execution</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Meeting Agent Features -->
+        <div class="agent-features-section">
+            <h3><i class="fas fa-video"></i> Meeting Agent Features</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <i class="fas fa-microphone"></i>
+                    <h4>Transcript Processing</h4>
+                    <p>Automatically extracts and processes Google Meet transcripts</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-brain"></i>
+                    <h4>AI Summarization</h4>
+                    <p>Uses Gemini AI to generate structured summaries and action items</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-file-alt"></i>
+                    <h4>Google Docs Integration</h4>
+                    <p>Creates formatted Google Docs with meeting notes</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-share"></i>
+                    <h4>Auto Distribution</h4>
+                    <p>Shares notes with attendees and sends email notifications</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contract Agent Features -->
+        <div class="agent-features-section">
+            <h3><i class="fas fa-file-contract"></i> Contract Agent Features</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <i class="fas fa-search"></i>
+                    <h4>Risk Detection</h4>
+                    <p>Identifies potential risks and problematic clauses using AI</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h4>Compliance Check</h4>
+                    <p>Verifies compliance with standard business practices</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-chart-line"></i>
+                    <h4>Analytics</h4>
+                    <p>Provides detailed analytics and clause-level insights</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-file-pdf"></i>
+                    <h4>Report Generation</h4>
+                    <p>Creates comprehensive HTML and PDF reports</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load dashboard stats
+    loadDashboardStats();
+    
+    // Refresh stats every 30 seconds
+    setInterval(loadDashboardStats, 30000);
+});
+
+function loadDashboardStats() {
+    // Load comprehensive email metrics
+    fetch('/api/email/metrics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.metrics) {
+                // Update all email-related metrics
+                document.getElementById('totalEmails').textContent = data.metrics.total_emails || '0';
+                document.getElementById('meetingsScheduled').textContent = data.metrics.meetings_scheduled || '0';
+                document.getElementById('responsesGenerated').textContent = data.metrics.responses_generated || '0';
+                document.getElementById('acceptanceRate').textContent = (data.metrics.acceptance_rate || 0) + '%';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading email metrics:', error);
+            // Set default values on error
+            document.getElementById('totalEmails').textContent = '0';
+            document.getElementById('meetingsScheduled').textContent = '0';
+            document.getElementById('responsesGenerated').textContent = '0';
+            document.getElementById('acceptanceRate').textContent = '0%';
+        });
+    
+    // Load contract reports count
+    fetch('/api/contract/reports')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('contractsAnalyzed').textContent = data.reports.length || '0';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading contract reports:', error);
+            document.getElementById('contractsAnalyzed').textContent = '0';
+        });
+}
+</script>
+{% endblock %}

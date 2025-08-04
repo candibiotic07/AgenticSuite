@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Agent - AgenticSuite{% endblock %}
+
+{% block content %}
+<div class="agent-page">
+    <div class="agent-header">
+        <div class="agent-title">
+            <i class="fas fa-video fa-2x"></i>
+            <div>
+                <h1>Meeting Agent</h1>
+                <p>Transform Google Meet recordings into AI-powered notes</p>
+            </div>
+        </div>
+        <div class="agent-status">
+            {% if meeting_available %}
+                <span class="status-badge status-active">
+                    <i class="fas fa-check-circle"></i> Active
+                </span>
+            {% else %}
+                <span class="status-badge status-inactive">
+                    <i class="fas fa-exclamation-triangle"></i> Unavailable
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not auth_status %}
+    <div class="auth-required">
+        <div class="auth-card">
+            <i class="fas fa-lock fa-2x"></i>
+            <h3>Authentication Required</h3>
+            <p>Please authenticate to access the Meeting Agent</p>
+            <a href="{{ url_for('auth_page') }}" class="btn btn-primary">Authenticate</a>
+        </div>
+    </div>
+    {% elif not meeting_available %}
+    <div class="agent-unavailable">
+        <div class="unavailable-card">
+            <i class="fas fa-exclamation-triangle fa-2x"></i>
+            <h3>Meeting Agent Unavailable</h3>
+            <p>The meeting agent could not be initialized. Please check your authentication and try again.</p>
+            <button onclick="window.location.reload()" class="btn btn-primary">Retry</button>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="agent-content">
+        <!-- Recent Meetings Panel -->
+        <div class="meetings-panel">
+            <h2><i class="fas fa-calendar"></i> Recent Meetings</h2>
+            <div class="meetings-controls">
+                <button id="loadMeetingsBtn" class="btn btn-primary" onclick="loadRecentMeetings()">
+                    <i class="fas fa-refresh"></i>
+                    Load Recent Meetings
+                </button>
+            </div>
+            
+            <div class="meetings-list" id="meetingsList">
+                <div class="empty-state">
+                    <i class="fas fa-calendar-times fa-2x"></i>
+                    <p>Click "Load Recent Meetings" to see your Google Calendar events</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Panel -->
+        <div class="processing-panel">
+            <h2><i class="fas fa-cogs"></i> Processing</h2>
+            <div class="processing-status" id="processingStatus">
+                <div class="status-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Select a meeting above to start processing</span>
+                </div>
+            </div>
+            
+            <div class="processing-steps">
+                <h3>Processing Steps:</h3>
+                <div class="steps-list">
+                    <div class="step">
+                        <i class="fas fa-search"></i>
+                        <span>Find meeting recording</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Extract transcript</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-brain"></i>
+                        <span>Generate AI summary</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-file-contract"></i>
+                        <span>Create Google Doc</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-share"></i>
+                        <span>Share with attendees</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="results-panel">
+            <h2><i class="fas fa-file-alt"></i> Generated Notes</h2>
+            <div class="results-content" id="resultsContent">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard fa-2x"></i>
+                    <p>Processed meeting notes will appear here</p>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let recentMeetings = [];
+
+function loadRecentMeetings() {
+    const btn = document.getElementById('loadMeetingsBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    
+    fetch('/api/meeting/recent')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.meetings) {
+                recentMeetings = data.meetings;
+                displayMeetings(data.meetings);
+                addProcessingStatus('Loaded recent meetings', 'success');
+            } else {
+                showNotification('Error loading meetings: ' + (data.message || 'Unknown error'), 'error');
+                addProcessingStatus('Failed to load meetings', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading meetings:', error);
+            showNotification('Connection error. Please try again.', 'error');
+            addProcessingStatus('Connection error while loading meetings', 'error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-refresh"></i> Load Recent Meetings';
+        });
+}
+
+function displayMeetings(meetings) {
+    const meetingsList = document.getElementById('meetingsList');
+    
+    if (!meetings || meetings.length === 0) {
+        meetingsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-calendar-times fa-2x"></i>
+                <p>No recent meetings found with Google Meet links</p>
+            </div>
+        `;
+        return;
+    }
+    
+    meetingsList.innerHTML = meetings.map((meeting, index) => `
+        <div class="meeting-item" onclick="selectMeeting(${index})">
+            <div class="meeting-icon">
+                <i class="fas fa-video"></i>
+            </div>
+            <div class="meeting-content">
+                <h4>${meeting.summary || 'Untitled Meeting'}</h4>
+                <p class="meeting-time">
+                    <i class="fas fa-clock"></i>
+                    ${formatMeetingTime(meeting.start, meeting.end)}
+                </p>
+                <p class="meeting-attendees">
+                    <i class="fas fa-users"></i>
+                    ${meeting.attendees ? meeting.attendees.length + ' attendees' : 'No attendees info'}
+                </p>
+            </div>
+            <div class="meeting-actions">
+                <button class="btn btn-sm btn-primary">
+                    <i class="fas fa-play"></i>
+                    Process
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectMeeting(index) {
+    const meeting = recentMeetings[index];
+    if (!meeting) return;
+    
+    addProcessingStatus(`Selected meeting: ${meeting.summary || 'Untitled Meeting'}`, 'info');
+    processMeeting(index);
+}
+
+function processMeeting(meetingIndex) {
+    const meeting = recentMeetings[meetingIndex];
+    addProcessingStatus('Starting meeting processing...', 'info');
+    
+    // Update processing steps to show progress
+    updateProcessingSteps('searching');
+    
+    fetch('/api/meeting/process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            meeting_index: meetingIndex
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addProcessingStatus('Meeting processing started successfully', 'success');
+            updateProcessingSteps('processing');
+            showNotification('Meeting processing started! This may take a few minutes.', 'success');
+            
+            // Poll for results (in a real implementation, you'd want WebSocket or Server-Sent Events)
+            pollForResults(meetingIndex);
+        } else {
+            addProcessingStatus('Meeting processing failed: ' + data.message, 'error');
+            updateProcessingSteps('error');
+            showNotification('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Meeting processing error:', error);
+        addProcessingStatus('Connection error during meeting processing', 'error');
+        updateProcessingSteps('error');
+        showNotification('Connection error. Please try again.', 'error');
+    });
+}
+
+function updateProcessingSteps(stage, progress = null) {
+    const steps = document.querySelectorAll('.step');
+    steps.forEach((step, index) => {
+        step.classList.remove('active', 'completed', 'error');
+    });
+    
+    if (progress && progress.current !== undefined) {
+        const currentStep = progress.current;
+        
+        steps.forEach((step, index) => {
+            if (index < currentStep) {
+                step.classList.add('completed');
+            } else if (index === currentStep) {
+                step.classList.add('active');
+            }
+        });
+        
+        // Handle completion
+        if (stage === 'completed' || stage === 'Completed') {
+            steps.forEach(step => {
+                step.classList.remove('active');
+                step.classList.add('completed');
+            });
+        }
+        
+        // Handle errors
+        if (stage === 'error' || stage === 'Error') {
+            steps.forEach(step => {
+                step.classList.add('error');
+            });
+        }
+    } else {
+        // Fallback to old logic for backward compatibility
+        if (stage === 'searching' || stage === 'Finding recording') {
+            steps[0]?.classList.add('active');
+        } else if (stage === 'processing' || stage === 'Analyzing content') {
+            steps[0]?.classList.add('completed');
+            steps[1]?.classList.add('active');
+        } else if (stage === 'completed' || stage === 'Completed') {
+            steps.forEach(step => step.classList.add('completed'));
+        } else if (stage === 'error' || stage === 'Error') {
+            steps.forEach(step => step.classList.add('error'));
+        }
+    }
+}
+
+function pollForResults(meetingIndex) {
+    const pollInterval = setInterval(() => {
+        fetch('/api/meeting/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const status = data.status;
+                    
+                    // Update progress based on current step
+                    updateProcessingSteps(status.current_step, status.progress);
+                    
+                    // Add new log entries
+                    if (status.logs && status.logs.length > 0) {
+                        const latestLog = status.logs[status.logs.length - 1];
+                        addProcessingStatus(latestLog.message, 
+                            latestLog.step === 'Error' ? 'error' : 'info');
+                    }
+                    
+                    // Check if processing is complete
+                    if (!status.active) {
+                        clearInterval(pollInterval);
+                        
+                        if (status.result && status.result.success) {
+                            updateProcessingSteps('completed', status.progress);
+                            addProcessingStatus('✨ Meeting processing completed successfully!', 'success');
+                            
+                            // Show real results with actual document link
+                            displayResults({
+                                title: 'AI Meeting Notes Generated',
+                                summary: `Meeting notes for "${status.result.meeting_title}" have been created and shared with ${status.result.attendee_emails.length} attendees.`,
+                                docLink: status.result.document_link,
+                                timestamp: new Date().toISOString(),
+                                meetingTitle: status.result.meeting_title,
+                                attendees: status.result.attendee_emails
+                            });
+                        } else {
+                            updateProcessingSteps('error', status.progress);
+                            addProcessingStatus('❌ Meeting processing failed', 'error');
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error polling meeting status:', error);
+                clearInterval(pollInterval);
+                updateProcessingSteps('error');
+                addProcessingStatus('Connection error while monitoring progress', 'error');
+            });
+    }, 2000); // Poll every 2 seconds
+}
+
+function displayResults(results) {
+    const resultsContent = document.getElementById('resultsContent');
+    resultsContent.innerHTML = `
+        <div class="result-item">
+            <div class="result-header">
+                <h3><i class="fas fa-file-alt"></i> ${results.title}</h3>
+                <span class="result-time">${new Date(results.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="result-content">
+                <p>${results.summary}</p>
+                <div class="result-actions">
+                    <a href="${results.docLink}" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-external-link-alt"></i>
+                        View Google Doc
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function addProcessingStatus(message, type) {
+    const processingStatus = document.getElementById('processingStatus');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const iconMap = {
+        'info': 'fas fa-info-circle',
+        'success': 'fas fa-check-circle text-success',
+        'error': 'fas fa-exclamation-triangle text-error',
+        'warning': 'fas fa-exclamation-circle text-warning'
+    };
+    
+    const statusItem = document.createElement('div');
+    statusItem.className = 'status-item';
+    statusItem.innerHTML = `
+        <i class="${iconMap[type] || iconMap.info}"></i>
+        <span>${message}</span>
+        <small>${timestamp}</small>
+    `;
+    
+    // Insert at the top
+    processingStatus.insertBefore(statusItem, processingStatus.firstChild);
+    
+    // Keep only the last 5 items
+    while (processingStatus.children.length > 5) {
+        processingStatus.removeChild(processingStatus.lastChild);
+    }
+}
+
+function formatMeetingTime(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const today = new Date();
+    
+    let dateStr = '';
+    if (startDate.toDateString() === today.toDateString()) {
+        dateStr = 'Today';
+    } else {
+        dateStr = startDate.toLocaleDateString();
+    }
+    
+    const timeStr = `${startDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+    
+    return `${dateStr}, ${timeStr}`;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Authentication - AgenticSuite{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <i class="fas fa-shield-alt fa-3x"></i>
+            <h1>Authenticate with Google</h1>
+            <p>Connect your Google account to enable AI agent access</p>
+        </div>
+
+        <div class="auth-content">
+            <div class="auth-info">
+                <h2>Required Permissions</h2>
+                <div class="permissions-grid">
+                    <div class="permission-item">
+                        <i class="fas fa-envelope"></i>
+                        <div>
+                            <h4>Gmail Access</h4>
+                            <p>Read and send emails for automation</p>
+                        </div>
+                    </div>
+                    <div class="permission-item">
+                        <i class="fas fa-calendar"></i>
+                        <div>
+                            <h4>Calendar Access</h4>
+                            <p>Schedule meetings and check availability</p>
+                        </div>
+                    </div>
+                    <div class="permission-item">
+                        <i class="fas fa-video"></i>
+                        <div>
+                            <h4>Google Meet</h4>
+                            <p>Access meeting recordings and transcripts</p>
+                        </div>
+                    </div>
+                    <div class="permission-item">
+                        <i class="fas fa-file-alt"></i>
+                        <div>
+                            <h4>Google Docs & Drive</h4>
+                            <p>Create and share meeting notes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-actions">
+                <div class="auth-status" id="authStatus">
+                    <div class="status-indicator" id="statusIndicator">
+                        <i class="fas fa-clock"></i>
+                        <span>Ready to authenticate</span>
+                    </div>
+                </div>
+
+                <button id="authenticateBtn" class="btn btn-primary btn-lg" onclick="startAuthentication()">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Start Authentication
+                </button>
+
+                <div class="auth-steps">
+                    <h3>What happens next:</h3>
+                    <ol>
+                        <li>Click "Start Authentication" above</li>
+                        <li>A new tab will open for Google OAuth</li>
+                        <li>Sign in to your Google account</li>
+                        <li>Grant the requested permissions</li>
+                        <li>Return to this page when complete</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-security">
+            <h3><i class="fas fa-lock"></i> Security & Privacy</h3>
+            <div class="security-notes">
+                <div class="security-note">
+                    <i class="fas fa-check"></i>
+                    <p>All credentials are stored locally on your device</p>
+                </div>
+                <div class="security-note">
+                    <i class="fas fa-check"></i>
+                    <p>No data is sent to external servers</p>
+                </div>
+                <div class="security-note">
+                    <i class="fas fa-check"></i>
+                    <p>You can revoke access anytime in Google Account settings</p>
+                </div>
+                <div class="security-note">
+                    <i class="fas fa-check"></i>
+                    <p>All AI processing requires your explicit approval</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let authCheckInterval;
+
+function startAuthentication() {
+    const btn = document.getElementById('authenticateBtn');
+    const statusIndicator = document.getElementById('statusIndicator');
+    
+    // Update UI
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+    statusIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Starting authentication...</span>';
+    
+    // Start authentication
+    fetch('/api/authenticate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusIndicator.innerHTML = '<i class="fas fa-check text-success"></i> <span>Authentication successful!</span>';
+            
+            // Show success message
+            showNotification('Authentication successful! Redirecting to dashboard...', 'success');
+            
+            // Redirect to dashboard after a short delay
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+            
+        } else {
+            statusIndicator.innerHTML = '<i class="fas fa-times text-error"></i> <span>Authentication failed</span>';
+            showNotification('Authentication failed: ' + data.message, 'error');
+            
+            // Reset button
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Try Again';
+        }
+    })
+    .catch(error => {
+        console.error('Authentication error:', error);
+        statusIndicator.innerHTML = '<i class="fas fa-times text-error"></i> <span>Connection error</span>';
+        showNotification('Connection error. Please try again.', 'error');
+        
+        // Reset button
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Try Again';
+    });
+}
+
+function checkAuthStatus() {
+    fetch('/api/auth/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.authenticated) {
+                // Already authenticated, redirect to dashboard
+                window.location.href = '/';
+            }
+        })
+        .catch(error => {
+            console.error('Auth status check error:', error);
+        });
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Check auth status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthStatus();
+});
+</script>
+{% endblock %}

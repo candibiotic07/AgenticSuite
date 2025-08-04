@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AgenticSuite{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-robot"></i>
+                <span>AgenticSuite</span>
+            </div>
+            
+            {% if auth_status %}
+            <div class="nav-menu">
+                <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="{{ url_for('email_dashboard') }}" class="nav-link {% if request.endpoint == 'email_dashboard' %}active{% endif %}">
+                    <i class="fas fa-envelope"></i> Email Agent
+                </a>
+                <a href="{{ url_for('meeting_dashboard') }}" class="nav-link {% if request.endpoint == 'meeting_dashboard' %}active{% endif %}">
+                    <i class="fas fa-video"></i> Meeting Agent
+                </a>
+                <a href="{{ url_for('contract_dashboard') }}" class="nav-link {% if request.endpoint == 'contract_dashboard' %}active{% endif %}">
+                    <i class="fas fa-file-contract"></i> Contract Agent
+                </a>
+            </div>
+            
+            <div class="nav-actions">
+                <div class="auth-status">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <span>Authenticated</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="nav-actions">
+                <a href="{{ url_for('auth_page') }}" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> Authenticate
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alerts">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <span>{{ message }}</span>
+                            <button class="alert-close" onclick="this.parentElement.style.display='none'">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2025 AgenticSuite - AI-Powered Automation Platform</p>
+            <div class="footer-links">
+                <span class="version">v1.0.0</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="modal">
+        <div class="modal-content loading-modal">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

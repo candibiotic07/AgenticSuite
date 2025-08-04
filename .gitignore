@@ -1,0 +1,8 @@
+aggenticsuite/
+backend/.env
+backend/token.json
+backend/client_secret_815841228751-t95l5cbijftl9b3euol7lkjnj1ne2d6t.apps.googleusercontent.com.json
+backend/__pycache__/
+backend/contractDATAtemp/
+backend/mailDATAtemp/
+backend/meetingDATAtemp/

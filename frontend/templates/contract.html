@@ -1,0 +1,763 @@
+{% extends "base.html" %}
+
+{% block title %}Contract Agent - AgenticSuite{% endblock %}
+
+{% block content %}
+<div class="agent-page">
+    <div class="agent-header">
+        <div class="agent-title">
+            <i class="fas fa-file-contract fa-2x"></i>
+            <div>
+                <h1>Contract Agent</h1>
+                <p>Advanced contract analysis with AI-powered risk detection</p>
+            </div>
+        </div>
+        <div class="agent-status">
+            {% if contract_available %}
+                <span class="status-badge status-active">
+                    <i class="fas fa-check-circle"></i> Active
+                </span>
+            {% else %}
+                <span class="status-badge status-inactive">
+                    <i class="fas fa-exclamation-triangle"></i> Unavailable
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not auth_status %}
+    <div class="auth-required">
+        <div class="auth-card">
+            <i class="fas fa-lock fa-2x"></i>
+            <h3>Authentication Required</h3>
+            <p>Please authenticate to access the Contract Agent</p>
+            <a href="{{ url_for('auth_page') }}" class="btn btn-primary">Authenticate</a>
+        </div>
+    </div>
+    {% elif not contract_available %}
+    <div class="agent-unavailable">
+        <div class="unavailable-card">
+            <i class="fas fa-exclamation-triangle fa-2x"></i>
+            <h3>Contract Agent Unavailable</h3>
+            <p>The contract agent could not be initialized. Please check your dependencies and try again.</p>
+            <button onclick="window.location.reload()" class="btn btn-primary">Retry</button>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="agent-content">
+        <!-- Upload Panel -->
+        <div class="upload-panel">
+            <h2><i class="fas fa-upload"></i> Upload Contract</h2>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-content">
+                    <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                    <h3>Drop contract file here</h3>
+                    <p>or click to select file</p>
+                    <div class="upload-info">
+                        <span>Supported formats: PDF, DOCX, TXT</span>
+                        <span>Max size: 10MB</span>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display: none;">
+            </div>
+            
+            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span id="progressText">Uploading...</span>
+            </div>
+        </div>
+
+        <!-- Analysis Results -->
+        <div class="analysis-panel">
+            <h2><i class="fas fa-chart-pie"></i> Analysis Results</h2>
+            <div class="analysis-content" id="analysisContent">
+                <div class="empty-state">
+                    <i class="fas fa-file-search fa-2x"></i>
+                    <p>Upload a contract to see AI analysis results</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports List -->
+        <div class="reports-panel">
+            <h2><i class="fas fa-list"></i> Recent Reports</h2>
+            <div class="reports-controls">
+                <button id="refreshReportsBtn" class="btn btn-secondary" onclick="loadReports()">
+                    <i class="fas fa-refresh"></i>
+                    Refresh Reports
+                </button>
+            </div>
+            <div class="reports-list" id="reportsList">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard fa-2x"></i>
+                    <p>No reports available. Upload and analyze contracts to generate reports.</p>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// File upload handling
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    
+    // Click to upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+    
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+    });
+    
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('drag-over');
+    });
+    
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileUpload(files[0]);
+        }
+    });
+    
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files[0]);
+        }
+    });
+    
+    // Load existing reports
+    loadReports();
+});
+
+function handleFileUpload(file) {
+    // Validate file
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type)) {
+        showNotification('Invalid file type. Please upload PDF, DOCX, or TXT files.', 'error');
+        return;
+    }
+    
+    if (file.size > maxSize) {
+        showNotification('File too large. Maximum size is 10MB.', 'error');
+        return;
+    }
+    
+    // Show progress
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    
+    uploadProgress.style.display = 'block';
+    progressText.textContent = 'Uploading...';
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Upload with progress tracking
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            progressFill.style.width = percentComplete + '%';
+            progressText.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+        }
+    });
+    
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            if (response.success) {
+                if (response.processing) {
+                    // Start polling for processing status
+                    progressText.textContent = 'Starting analysis...';
+                    startContractProcessingPoll();
+                } else if (response.analysis) {
+                    // Direct analysis result (fallback)
+                    progressText.textContent = 'Analysis complete!';
+                    showNotification('Contract analyzed successfully!', 'success');
+                    displayAnalysisResults(response.analysis);
+                    loadReports();
+                    hideProgressAfterDelay();
+                }
+            } else {
+                showNotification('Analysis failed: ' + response.message, 'error');
+                hideProgressAfterDelay();
+            }
+        } else {
+            showNotification('Upload failed. Please try again.', 'error');
+            hideProgressAfterDelay();
+        }
+    };
+    
+    xhr.onerror = function() {
+        showNotification('Upload failed. Please check your connection.', 'error');
+        uploadProgress.style.display = 'none';
+    };
+    
+    xhr.open('POST', '/api/contract/upload');
+    xhr.send(formData);
+}
+
+// Global variable to store original clauses for sorting
+let originalClausesData = null;
+
+function displayAnalysisResults(analysis) {
+    // Store original clauses data for sorting
+    originalClausesData = analysis.clauses ? [...analysis.clauses] : [];
+    window.currentAnalysis = analysis;
+    
+    const analysisContent = document.getElementById('analysisContent');
+    
+    analysisContent.innerHTML = `
+        <div class="analysis-summary">
+            <h3><i class="fas fa-file-contract"></i> ${analysis.document_id}</h3>
+            <div class="analysis-metrics">
+                <div class="metric">
+                    <span class="metric-label">Total Clauses:</span>
+                    <span class="metric-value">${analysis.total_clauses}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">High Risk:</span>
+                    <span class="metric-value text-error">${analysis.high_risk_clauses}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Medium Risk:</span>
+                    <span class="metric-value text-warning">${analysis.medium_risk_clauses || 0}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Low Risk:</span>
+                    <span class="metric-value text-success">${analysis.low_risk_clauses || 0}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Processing Time:</span>
+                    <span class="metric-value">${analysis.processing_stats?.processing_time_seconds?.toFixed(2) || 'N/A'}s</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="executive-summary">
+            <h4><i class="fas fa-eye"></i> Executive Summary</h4>
+            <p>${analysis.executive_summary || 'No executive summary available.'}</p>
+        </div>
+        
+        <div class="risk-overview">
+            <h4><i class="fas fa-exclamation-triangle"></i> Risk Overview</h4>
+            <div class="risk-indicator ${analysis.high_risk_clauses > 0 ? 'high-risk' : 'low-risk'}">
+                <i class="fas fa-shield-alt"></i>
+                <span>${analysis.high_risk_clauses > 0 ? 'High Risk Detected' : 'Low Risk'}</span>
+            </div>
+        </div>
+        
+        <div class="report-links">
+            <h4><i class="fas fa-download"></i> Generated Reports</h4>
+            <div class="report-buttons">
+                ${analysis.html_report ? `
+                    <a href="/api/contract/report/${analysis.html_report}" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-globe"></i> View HTML Report
+                    </a>
+                ` : ''}
+                ${analysis.pdf_report ? `
+                    <a href="/api/contract/report/${analysis.pdf_report}" target="_blank" class="btn btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Download PDF Report
+                    </a>
+                ` : ''}
+            </div>
+        </div>
+        
+        <div class="clauses-summary">
+            <div class="clauses-header">
+                <h4><i class="fas fa-file-contract"></i> Contract Clause Summary</h4>
+                <div class="sort-controls">
+                    <label for="clauseSort">Sort by:</label>
+                    <select id="clauseSort" onchange="sortClauses(this.value)">
+                        <option value="contract">Contract Order</option>
+                        <option value="priority">Priority Score</option>
+                    </select>
+                </div>
+            </div>
+            <p class="summary-instruction">Overview of all clauses identified in this contract. Click expand to view detailed analysis.</p>
+            
+            <div class="summary-list" id="clausesList">
+                ${analysis.clauses ? analysis.clauses.map((clause, index) => `
+                    <div class="summary-item" data-original-index="${index}" data-clause-id="${index}">
+                        <div class="summary-content">
+                            <div class="summary-header">
+                                <div class="summary-left">
+                                    <span class="summary-number">${index + 1}.</span>
+                                    <span class="summary-type">${clause.clause_type.replace(/_/g, ' ').toUpperCase()}</span>
+                                    <span class="summary-risk risk-${clause.risk_level.toLowerCase()}">${clause.risk_level}</span>
+                                    <span class="summary-priority">Priority: ${clause.priority_score ? clause.priority_score.toFixed(1) : 'N/A'}</span>
+                                </div>
+                                <button class="clause-expand-btn" onclick="toggleClauseDetail(${index})" title="View detailed analysis">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="summary-preview">
+                                ${clause.text.substring(0, 150)}${clause.text.length > 150 ? '...' : ''}
+                            </div>
+                            
+                            <!-- Detailed Analysis Section (Hidden by default) -->
+                            <div class="clause-details" id="clause-details-${index}" style="display: none;">
+                                <div class="clause-full-text">
+                                    <strong>Complete Clause Text:</strong>
+                                    <p>${clause.text}</p>
+                                </div>
+                                
+                                <div class="clause-analysis">
+                                    <strong>AI Analysis:</strong>
+                                    <p>${clause.rationale}</p>
+                                    
+                                    ${clause.suggestions && clause.suggestions.length > 0 ? `
+                                        <div class="clause-suggestions">
+                                            <strong>Suggestions:</strong>
+                                            <ul>
+                                                ${clause.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${clause.rule_matches && clause.rule_matches.length > 0 ? `
+                                        <div class="clause-rules">
+                                            <strong>Matched Rules:</strong>
+                                            <ul class="rule-tags">
+                                                ${clause.rule_matches.map(rule => `<span class="rule-tag">${rule}</span>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    <div class="clause-metrics">
+                                        <span class="priority-score">Priority Score: ${clause.priority_score ? clause.priority_score.toFixed(2) : 'N/A'}</span>
+                                        <span class="confidence">Confidence: ${Math.round(clause.confidence * 100)}%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="feedback-section">
+                                    <h5>Provide Feedback</h5>
+                                    <div class="feedback-options" id="feedback-options-${index}">
+                                        <button class="feedback-btn agree" onclick="provideFeedback(${index}, 'agree')">
+                                            <i class="fas fa-thumbs-up"></i> Agree
+                                        </button>
+                                        <button class="feedback-btn disagree" onclick="provideFeedback(${index}, 'disagree')">
+                                            <i class="fas fa-thumbs-down"></i> Disagree
+                                        </button>
+                                        <button class="feedback-btn suggest" onclick="provideFeedback(${index}, 'suggest')">
+                                            <i class="fas fa-edit"></i> Suggest Changes
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="feedback-form" id="feedback-form-${index}" style="display: none;">
+                                        <textarea id="feedback-text-${index}" placeholder="Please provide your detailed feedback..." rows="3"></textarea>
+                                        <div class="risk-override">
+                                            <label for="risk-override-${index}">Override Risk Level (optional):</label>
+                                            <select id="risk-override-${index}">
+                                                <option value="">Keep current assessment</option>
+                                                <option value="LOW">Low Risk</option>
+                                                <option value="MEDIUM">Medium Risk</option>
+                                                <option value="HIGH">High Risk</option>
+                                            </select>
+                                        </div>
+                                        <div class="feedback-actions">
+                                            <button class="btn btn-primary" onclick="submitFeedback(${index})">Submit Feedback</button>
+                                            <button class="btn btn-secondary" onclick="cancelFeedback(${index})">Cancel</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="feedback-status" id="feedback-status-${index}"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('') : '<p>No clauses found</p>'}
+            </div>
+        </div>
+
+    `;
+    
+    // Store analysis data globally for feedback submission
+    window.currentAnalysis = analysis;
+}
+
+function loadReports() {
+    const btn = document.getElementById('refreshReportsBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    
+    fetch('/api/contract/reports')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayReports(data.reports);
+            } else {
+                showNotification('Error loading reports: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading reports:', error);
+            showNotification('Connection error. Please try again.', 'error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-refresh"></i> Refresh Reports';
+        });
+}
+
+function displayReports(reports) {
+    const reportsList = document.getElementById('reportsList');
+    
+    if (!reports || reports.length === 0) {
+        reportsList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-clipboard fa-2x"></i>
+                <p>No reports available. Upload and analyze contracts to generate reports.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    reportsList.innerHTML = reports.map(report => `
+        <div class="report-item">
+            <div class="report-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="report-content">
+                <h4>${report.filename.replace('.html', '').replace(/_/g, ' ')}</h4>
+                <p class="report-date">
+                    <i class="fas fa-calendar"></i>
+                    ${new Date(report.created).toLocaleString()}
+                </p>
+                <p class="report-size">
+                    <i class="fas fa-file"></i>
+                    ${formatFileSize(report.size)}
+                </p>
+            </div>
+            <div class="report-actions">
+                <a href="/api/contract/report/${report.filename}" target="_blank" class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye"></i>
+                    View Report
+                </a>
+            </div>
+        </div>
+    `).join('');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Clause detail toggle functionality
+function toggleClauseDetail(clauseId) {
+    const details = document.getElementById(`clause-details-${clauseId}`);
+    const button = document.querySelector(`.summary-item[data-clause-id="${clauseId}"] .clause-expand-btn i`);
+    
+    if (details.style.display === 'none' || details.style.display === '') {
+        details.style.display = 'block';
+        button.classList.remove('fa-chevron-down');
+        button.classList.add('fa-chevron-up');
+        details.style.animation = 'slideDown 0.3s ease-out';
+    } else {
+        details.style.display = 'none';
+        button.classList.remove('fa-chevron-up');
+        button.classList.add('fa-chevron-down');
+    }
+}
+
+function provideFeedback(clauseId, feedbackType) {
+    if (feedbackType === 'suggest') {
+        showFeedbackForm(clauseId);
+        return;
+    }
+    
+    // Submit simple feedback
+    const feedbackData = {
+        document_id: window.currentAnalysis.document_id,
+        clause_id: clauseId,
+        feedback_type: feedbackType,
+        feedback_text: feedbackType === 'agree' ? 'User agrees with the analysis' : 'User disagrees with the analysis'
+    };
+    
+    submitFeedbackData(clauseId, feedbackData);
+}
+
+function showFeedbackForm(clauseId) {
+    const form = document.getElementById(`feedback-form-${clauseId}`);
+    const options = form.previousElementSibling;
+    
+    options.style.display = 'none';
+    form.style.display = 'block';
+}
+
+function cancelFeedback(clauseId) {
+    const form = document.getElementById(`feedback-form-${clauseId}`);
+    const options = form.previousElementSibling;
+    
+    form.style.display = 'none';
+    options.style.display = 'block';
+    
+    // Clear form
+    document.getElementById(`feedback-text-${clauseId}`).value = '';
+    document.getElementById(`risk-override-${clauseId}`).value = '';
+}
+
+function submitFeedback(clauseId) {
+    const feedbackText = document.getElementById(`feedback-text-${clauseId}`).value;
+    const riskOverride = document.getElementById(`risk-override-${clauseId}`).value;
+    
+    if (!feedbackText.trim()) {
+        showNotification('Please enter your feedback', 'error');
+        return;
+    }
+    
+    const feedbackData = {
+        document_id: window.currentAnalysis.document_id,
+        clause_id: clauseId,
+        feedback_type: 'suggestion',
+        feedback_text: feedbackText,
+        risk_override: riskOverride || null
+    };
+    
+    submitFeedbackData(clauseId, feedbackData);
+}
+
+function submitFeedbackData(clauseId, feedbackData) {
+    const statusDiv = document.getElementById(`feedback-status-${clauseId}`);
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting feedback...';
+    
+    fetch('/api/contract/feedback', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(feedbackData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            statusDiv.innerHTML = '<i class="fas fa-check text-success"></i> Feedback submitted successfully!';
+            showNotification('Thank you for your feedback! This will help improve future analysis.', 'success');
+            
+            // Hide feedback form and show success state
+            const form = document.getElementById(`feedback-form-${clauseId}`);
+            const options = form?.previousElementSibling;
+            if (form) form.style.display = 'none';
+            if (options) {
+                options.innerHTML = '<p class="feedback-submitted"><i class="fas fa-check"></i> Feedback submitted</p>';
+            }
+        } else {
+            statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle text-error"></i> Failed to submit feedback';
+            showNotification('Error submitting feedback: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Feedback submission error:', error);
+        statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle text-error"></i> Connection error';
+        showNotification('Connection error. Please try again.', 'error');
+    });
+}
+
+// Sort clauses functionality
+function sortClauses(sortBy) {
+    if (!originalClausesData || originalClausesData.length === 0) {
+        return;
+    }
+    
+    const clausesList = document.getElementById('clausesList');
+    let sortedClauses = [...originalClausesData];
+    
+    if (sortBy === 'priority') {
+        // Sort by priority score (high to low)
+        sortedClauses.sort((a, b) => {
+            const priorityA = a.priority_score || 0;
+            const priorityB = b.priority_score || 0;
+            return priorityB - priorityA;
+        });
+    } else {
+        // Default: contract order (original order)
+        sortedClauses = [...originalClausesData];
+    }
+    
+    // Re-render the clauses list with sorted data (using the new summary structure)
+    clausesList.innerHTML = sortedClauses.map((clause, index) => `
+        <div class="summary-item" data-original-index="${index}" data-clause-id="${index}" data-sort-order="${sortBy}">
+            <div class="summary-content">
+                <div class="summary-header">
+                    <div class="summary-left">
+                        <span class="summary-number">${index + 1}.</span>
+                        <span class="summary-type">${clause.clause_type.replace(/_/g, ' ').toUpperCase()}</span>
+                        <span class="summary-risk risk-${clause.risk_level.toLowerCase()}">${clause.risk_level}</span>
+                        <span class="summary-priority">Priority: ${clause.priority_score ? clause.priority_score.toFixed(1) : 'N/A'}</span>
+                    </div>
+                    <button class="clause-expand-btn" onclick="toggleClauseDetail(${index})" title="View detailed analysis">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="summary-preview">
+                    ${clause.text.substring(0, 150)}${clause.text.length > 150 ? '...' : ''}
+                </div>
+                
+                <!-- Detailed Analysis Section (Hidden by default) -->
+                <div class="clause-details" id="clause-details-${index}" style="display: none;">
+                    <div class="clause-full-text">
+                        <strong>Complete Clause Text:</strong>
+                        <p>${clause.text}</p>
+                    </div>
+                    
+                    <div class="clause-analysis">
+                        <strong>AI Analysis:</strong>
+                        <p>${clause.rationale}</p>
+                        
+                        ${clause.suggestions && clause.suggestions.length > 0 ? `
+                            <div class="clause-suggestions">
+                                <strong>Suggestions:</strong>
+                                <ul>
+                                    ${clause.suggestions.map(suggestion => `<li>${suggestion}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        
+                        ${clause.rule_matches && clause.rule_matches.length > 0 ? `
+                            <div class="clause-rules">
+                                <strong>Matched Rules:</strong>
+                                <ul class="rule-tags">
+                                    ${clause.rule_matches.map(rule => `<span class="rule-tag">${rule}</span>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="clause-metrics">
+                            <span class="priority-score">Priority Score: ${clause.priority_score ? clause.priority_score.toFixed(2) : 'N/A'}</span>
+                            <span class="confidence">Confidence: ${Math.round(clause.confidence * 100)}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feedback-section">
+                        <h5>Provide Feedback</h5>
+                        <div class="feedback-options" id="feedback-options-${index}">
+                            <button class="feedback-btn agree" onclick="provideFeedback(${index}, 'agree')">
+                                <i class="fas fa-thumbs-up"></i> Agree
+                            </button>
+                            <button class="feedback-btn disagree" onclick="provideFeedback(${index}, 'disagree')">
+                                <i class="fas fa-thumbs-down"></i> Disagree
+                            </button>
+                            <button class="feedback-btn suggest" onclick="provideFeedback(${index}, 'suggest')">
+                                <i class="fas fa-edit"></i> Suggest Changes
+                            </button>
+                        </div>
+                        
+                        <div class="feedback-form" id="feedback-form-${index}" style="display: none;">
+                            <textarea id="feedback-text-${index}" placeholder="Please provide your detailed feedback..." rows="3"></textarea>
+                            <div class="risk-override">
+                                <label for="risk-override-${index}">Override Risk Level (optional):</label>
+                                <select id="risk-override-${index}">
+                                    <option value="">Keep current assessment</option>
+                                    <option value="LOW">Low Risk</option>
+                                    <option value="MEDIUM">Medium Risk</option>
+                                    <option value="HIGH">High Risk</option>
+                                </select>
+                            </div>
+                            <div class="feedback-actions">
+                                <button class="btn btn-primary" onclick="submitFeedback(${index})">Submit Feedback</button>
+                                <button class="btn btn-secondary" onclick="cancelFeedback(${index})">Cancel</button>
+                            </div>
+                        </div>
+                        
+                        <div class="feedback-status" id="feedback-status-${index}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    // Show visual feedback for sorting
+    showNotification(`Clauses sorted by ${sortBy === 'priority' ? 'Priority Score' : 'Contract Order'}`, 'success');
+}
+
+// Contract processing progress polling
+function startContractProcessingPoll() {
+    const progressText = document.getElementById('progressText');
+    const progressFill = document.getElementById('progressFill');
+    
+    const pollInterval = setInterval(() => {
+        fetch('/api/contract/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.status) {
+                    const status = data.status;
+                    
+                    if (status.active) {
+                        // Update progress display
+                        const progressPercent = (status.progress.current / status.progress.total) * 100;
+                        progressFill.style.width = progressPercent + '%';
+                        progressText.textContent = status.current_step;
+                        
+                        // Show latest log if available
+                        if (status.logs && status.logs.length > 0) {
+                            const latestLog = status.logs[status.logs.length - 1];
+                            progressText.textContent = latestLog;
+                        }
+                    } else {
+                        // Processing complete
+                        clearInterval(pollInterval);
+                        
+                        if (status.result) {
+                            if (status.result.success) {
+                                progressText.textContent = 'Analysis complete!';
+                                progressFill.style.width = '100%';
+                                showNotification('Contract analyzed successfully!', 'success');
+                                displayAnalysisResults(status.result.analysis);
+                                loadReports();
+                            } else {
+                                progressText.textContent = 'Analysis failed';
+                                showNotification('Analysis failed: ' + status.result.message, 'error');
+                            }
+                        } else {
+                            progressText.textContent = 'Processing complete';
+                        }
+                        
+                        hideProgressAfterDelay();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error polling contract status:', error);
+                clearInterval(pollInterval);
+                progressText.textContent = 'Connection error';
+                hideProgressAfterDelay();
+            });
+    }, 1000); // Poll every second
+}
+
+function hideProgressAfterDelay() {
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressFill = document.getElementById('progressFill');
+    
+    setTimeout(() => {
+        uploadProgress.style.display = 'none';
+        progressFill.style.width = '0%';
+    }, 3000); // Hide after 3 seconds
+}
+</script>
+{% endblock %}

@@ -1,0 +1,678 @@
+{% extends "base.html" %}
+
+{% block title %}Email Agent - AgenticSuite{% endblock %}
+
+{% block content %}
+<div class="agent-page">
+    <div class="agent-header">
+        <div class="agent-title">
+            <i class="fas fa-envelope fa-2x"></i>
+            <div>
+                <h1>Email Agent</h1>
+                <p>AI-powered email automation and intelligent responses</p>
+            </div>
+        </div>
+        <div class="agent-status">
+            {% if email_available %}
+                <span class="status-badge status-active">
+                    <i class="fas fa-check-circle"></i> Active
+                </span>
+            {% else %}
+                <span class="status-badge status-inactive">
+                    <i class="fas fa-exclamation-triangle"></i> Unavailable
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not auth_status %}
+    <div class="auth-required">
+        <div class="auth-card">
+            <i class="fas fa-lock fa-2x"></i>
+            <h3>Authentication Required</h3>
+            <p>Please authenticate to access the Email Agent</p>
+            <a href="{{ url_for('auth_page') }}" class="btn btn-primary">Authenticate</a>
+        </div>
+    </div>
+    {% elif not email_available %}
+    <div class="agent-unavailable">
+        <div class="unavailable-card">
+            <i class="fas fa-exclamation-triangle fa-2x"></i>
+            <h3>Email Agent Unavailable</h3>
+            <p>The email agent could not be initialized. Please check your authentication and try again.</p>
+            <button onclick="window.location.reload()" class="btn btn-primary">Retry</button>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="agent-content">
+        <!-- Configuration Panel -->
+        <div class="config-panel">
+            <h2><i class="fas fa-cog"></i> Configuration</h2>
+            <div class="config-form">
+                <div class="form-group">
+                    <label for="lookbackHours">
+                        <i class="fas fa-clock"></i> Lookback Period (hours)
+                    </label>
+                    <input type="number" id="lookbackHours" value="72" min="1" max="168">
+                    <small>How far back to check for emails (1-168 hours)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confidenceThreshold">
+                        <i class="fas fa-brain"></i> AI Confidence Threshold
+                    </label>
+                    <input type="range" id="confidenceThreshold" min="0.1" max="1" step="0.1" value="0.7">
+                    <span id="confidenceValue">0.7</span>
+                    <small>Minimum confidence level for AI actions (0.1-1.0)</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Panel -->
+        <div class="action-panel">
+            <h2><i class="fas fa-play"></i> Actions</h2>
+            <div class="action-buttons">
+                <button id="processEmailsBtn" class="btn btn-primary" onclick="processEmails()">
+                    <i class="fas fa-paper-plane"></i>
+                    Process Emails
+                </button>
+                <button id="refreshMetricsBtn" class="btn btn-secondary" onclick="loadMetrics()">
+                    <i class="fas fa-refresh"></i>
+                    Refresh Metrics
+                </button>
+            </div>
+        </div>
+
+        <!-- Metrics Panel -->
+        <div class="metrics-panel">
+            <h2><i class="fas fa-chart-bar"></i> Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="totalEmails">-</h3>
+                        <p>Total Emails</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-calendar-plus"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="meetingsScheduled">-</h3>
+                        <p>Meetings Scheduled</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-reply"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="responsesGenerated">-</h3>
+                        <p>Responses Generated</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="acceptanceRate">-</h3>
+                        <p>Acceptance Rate</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="timeSaved">-</h3>
+                        <p>Time Saved (Minutes)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Status -->
+        <div class="processing-panel">
+            <h2><i class="fas fa-cogs"></i> Processing Status</h2>
+            <div class="processing-status" id="processingStatus">
+                <div class="status-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Email Agent ready. Click "Process Emails" to start automation.</span>
+                </div>
+            </div>
+            
+            <div class="processing-progress" id="processingProgress" style="display: none;">
+                <div class="progress-info">
+                    <span id="progressText">Processing emails...</span>
+                    <span id="progressCount">0/0</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Drafts -->
+        <div class="drafts-panel">
+            <h2><i class="fas fa-edit"></i> Pending Drafts</h2>
+            <div class="drafts-container" id="draftsContainer">
+                <div class="empty-state">
+                    <i class="fas fa-file-alt fa-2x"></i>
+                    <p>No pending drafts. Process emails to generate responses.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="activity-panel">
+            <h2><i class="fas fa-list"></i> Processing Logs</h2>
+            <div class="activity-log" id="activityLog">
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        <i class="fas fa-info-circle"></i>
+                    </div>
+                    <div class="activity-content">
+                        <p>Email Agent ready. Click "Process Emails" to start automation.</p>
+                        <span class="activity-time">Just now</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Update confidence value display
+document.getElementById('confidenceThreshold').addEventListener('input', function() {
+    document.getElementById('confidenceValue').textContent = this.value;
+});
+
+function processEmails() {
+    const btn = document.getElementById('processEmailsBtn');
+    const lookbackHours = document.getElementById('lookbackHours').value;
+    const confidenceThreshold = document.getElementById('confidenceThreshold').value;
+    
+    // Update UI
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    // Clear previous logs
+    const activityLog = document.getElementById('activityLog');
+    activityLog.innerHTML = '';
+    
+    // Send request
+    fetch('/api/email/process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            lookback_hours: parseInt(lookbackHours),
+            confidence_threshold: parseFloat(confidenceThreshold)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Email processing started!', 'success');
+            
+            // Start polling for status updates
+            startProcessingStatusPolling();
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane"></i> Process Emails';
+        }
+    })
+    .catch(error => {
+        console.error('Email processing error:', error);
+        showNotification('Connection error. Please try again.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Process Emails';
+    });
+}
+
+function loadMetrics() {
+    const btn = document.getElementById('refreshMetricsBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    
+    fetch('/api/email/metrics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.metrics) {
+                updateMetricsDisplay(data.metrics);
+                addActivityLog('Metrics updated', 'info');
+            } else {
+                console.warn('No metrics available');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading metrics:', error);
+            addActivityLog('Failed to load metrics', 'error');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-refresh"></i> Refresh Metrics';
+        });
+}
+
+function updateMetricsDisplay(metrics) {
+    document.getElementById('totalEmails').textContent = metrics.total_emails || '0';
+    document.getElementById('meetingsScheduled').textContent = metrics.meetings_scheduled || '0';
+    document.getElementById('responsesGenerated').textContent = metrics.responses_generated || '0';
+    
+    const acceptanceRate = metrics.acceptance_rate || 0;
+    document.getElementById('acceptanceRate').textContent = acceptanceRate.toFixed(1) + '%';
+    
+    // Update estimated time saved
+    const timeSavedElement = document.getElementById('timeSaved');
+    if (timeSavedElement) {
+        const timeSaved = metrics.estimated_time_saved || 0;
+        timeSavedElement.textContent = Math.round(timeSaved) + ' min';
+    }
+}
+
+function addActivityLog(message, type) {
+    const activityLog = document.getElementById('activityLog');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const iconMap = {
+        'info': 'fas fa-info-circle',
+        'success': 'fas fa-check-circle text-success',
+        'error': 'fas fa-exclamation-triangle text-error',
+        'warning': 'fas fa-exclamation-circle text-warning'
+    };
+    
+    const activityItem = document.createElement('div');
+    activityItem.className = 'activity-item';
+    activityItem.innerHTML = `
+        <div class="activity-icon">
+            <i class="${iconMap[type] || iconMap.info}"></i>
+        </div>
+        <div class="activity-content">
+            <p>${message}</p>
+            <span class="activity-time">${timestamp}</span>
+        </div>
+    `;
+    
+    // Insert at the top
+    activityLog.insertBefore(activityItem, activityLog.firstChild);
+    
+    // Keep only the last 10 items
+    while (activityLog.children.length > 10) {
+        activityLog.removeChild(activityLog.lastChild);
+    }
+}
+
+// Processing status polling
+let processingPollingInterval = null;
+
+function startProcessingStatusPolling() {
+    // Stop any existing polling
+    if (processingPollingInterval) {
+        clearInterval(processingPollingInterval);
+    }
+    
+    // Start polling every 2 seconds
+    processingPollingInterval = setInterval(pollProcessingStatus, 2000);
+    
+    // Also poll immediately
+    pollProcessingStatus();
+}
+
+function stopProcessingStatusPolling() {
+    if (processingPollingInterval) {
+        clearInterval(processingPollingInterval);
+        processingPollingInterval = null;
+    }
+    
+    // Reset button
+    const btn = document.getElementById('processEmailsBtn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Process Emails';
+    
+    // Hide progress bar
+    document.getElementById('processingProgress').style.display = 'none';
+}
+
+function pollProcessingStatus() {
+    fetch('/api/email/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateProcessingStatus(data.status);
+                
+                // If processing is complete, stop polling
+                if (!data.status.active) {
+                    stopProcessingStatusPolling();
+                    
+                    // Load final metrics and drafts
+                    loadMetrics();
+                    loadPendingDrafts();
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Failed to poll processing status:', error);
+        });
+}
+
+function updateProcessingStatus(status) {
+    const processingProgress = document.getElementById('processingProgress');
+    const progressText = document.getElementById('progressText');
+    const progressCount = document.getElementById('progressCount');
+    const progressFill = document.getElementById('progressFill');
+    
+    if (status.active) {
+        // Show progress bar
+        processingProgress.style.display = 'block';
+        
+        // Update progress
+        const { current, total } = status.progress;
+        progressCount.textContent = `${current}/${total}`;
+        
+        if (total > 0) {
+            const percentage = (current / total) * 100;
+            progressFill.style.width = percentage + '%';
+        }
+        
+        // Update current email info
+        if (status.current_email) {
+            progressText.textContent = `Processing: ${status.current_email.sender}`;
+        } else {
+            progressText.textContent = 'Processing emails...';
+        }
+    } else {
+        processingProgress.style.display = 'none';
+    }
+    
+    // Update activity log with new logs
+    if (status.logs) {
+        updateActivityLog(status.logs);
+    }
+}
+
+function updateActivityLog(logs) {
+    const activityLog = document.getElementById('activityLog');
+    
+    // Clear existing logs and add new ones
+    activityLog.innerHTML = '';
+    
+    logs.forEach(log => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        
+        const iconMap = {
+            'info': 'fas fa-info-circle',
+            'success': 'fas fa-check-circle text-success',
+            'error': 'fas fa-exclamation-triangle text-error',
+            'warning': 'fas fa-exclamation-circle text-warning',
+            'draft': 'fas fa-edit text-warning'
+        };
+        
+        const timestamp = new Date(log.timestamp).toLocaleTimeString();
+        
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${iconMap[log.type] || iconMap.info}"></i>
+            </div>
+            <div class="activity-content">
+                <p>${log.message}</p>
+                <span class="activity-time">${timestamp}</span>
+            </div>
+        `;
+        
+        activityLog.appendChild(activityItem);
+    });
+    
+    // Scroll to bottom
+    activityLog.scrollTop = activityLog.scrollHeight;
+}
+
+function loadPendingDrafts() {
+    fetch('/api/email/drafts')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayPendingDrafts(data.drafts);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load pending drafts:', error);
+        });
+}
+
+function displayPendingDrafts(drafts) {
+    const draftsContainer = document.getElementById('draftsContainer');
+    
+    if (!drafts || drafts.length === 0) {
+        draftsContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-file-alt fa-2x"></i>
+                <p>No pending drafts. Process emails to generate responses.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    draftsContainer.innerHTML = drafts.map(draft => {
+        if (draft.category === 'MEETING_REQUEST') {
+            // Handle meeting requests with time slot selection
+            const slotsHtml = draft.available_slots.map((slot, index) => `
+                <div class="time-slot-option">
+                    <input type="radio" name="slot-${draft.id}" id="slot-${draft.id}-${index}" value="${index}">
+                    <label for="slot-${draft.id}-${index}">
+                        <i class="fas fa-calendar-alt"></i>
+                        ${slot.display}
+                    </label>
+                </div>
+            `).join('');
+            
+            return `
+                <div class="draft-item meeting-request" data-draft-id="${draft.id}">
+                    <div class="draft-header">
+                        <h4><i class="fas fa-calendar-check"></i> Meeting Request from: ${draft.email.sender}</h4>
+                        <span class="draft-category meeting-category">${draft.category}</span>
+                    </div>
+                    <div class="draft-subject">
+                        <strong>Subject:</strong> ${draft.email.subject}
+                    </div>
+                    <div class="time-slots-selection">
+                        <label><strong>Select a time slot:</strong></label>
+                        <div class="time-slots-grid">
+                            ${slotsHtml}
+                        </div>
+                    </div>
+                    <div class="draft-actions">
+                        <button class="btn btn-success" onclick="scheduleMeeting('${draft.id}')">
+                            <i class="fas fa-calendar-plus"></i> Schedule Meeting
+                        </button>
+                        <button class="btn btn-danger" onclick="rejectDraft('${draft.id}')">
+                            <i class="fas fa-times"></i> Decline
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Handle regular email drafts
+            return `
+                <div class="draft-item" data-draft-id="${draft.id}">
+                    <div class="draft-header">
+                        <h4><i class="fas fa-reply"></i> Response to: ${draft.email.sender}</h4>
+                        <span class="draft-category">${draft.category}</span>
+                    </div>
+                    <div class="draft-subject">
+                        <strong>Subject:</strong> Re: ${draft.email.subject}
+                    </div>
+                    <div class="draft-content">
+                        <label>Draft Response:</label>
+                        <textarea class="draft-text" id="draft-${draft.id}">${draft.draft}</textarea>
+                    </div>
+                    <div class="draft-actions">
+                        <button class="btn btn-success" onclick="approveDraft('${draft.id}')">
+                            <i class="fas fa-check"></i> Send
+                        </button>
+                        <button class="btn btn-secondary" onclick="editDraft('${draft.id}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-danger" onclick="rejectDraft('${draft.id}')">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }).join('');
+}
+
+function scheduleMeeting(draftId) {
+    // Get selected time slot
+    const selectedSlot = document.querySelector(`input[name="slot-${draftId}"]:checked`);
+    
+    if (!selectedSlot) {
+        showNotification('Please select a time slot before scheduling the meeting.', 'warning');
+        return;
+    }
+    
+    const selectedSlotIndex = parseInt(selectedSlot.value);
+    
+    // Disable the button and show loading
+    const scheduleBtn = document.querySelector(`[data-draft-id="${draftId}"] .btn-success`);
+    const originalText = scheduleBtn.innerHTML;
+    scheduleBtn.disabled = true;
+    scheduleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling...';
+    
+    fetch(`/api/email/drafts/${draftId}/approve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            selected_slot_index: selectedSlotIndex
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(data.message, 'success');
+            removeDraftFromUI(draftId);
+            loadMetrics(); // Refresh metrics
+        } else {
+            showNotification('Failed to schedule meeting: ' + data.message, 'error');
+            scheduleBtn.disabled = false;
+            scheduleBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error scheduling meeting:', error);
+        showNotification('Connection error. Please try again.', 'error');
+        scheduleBtn.disabled = false;
+        scheduleBtn.innerHTML = originalText;
+    });
+}
+
+function approveDraft(draftId) {
+    const draftTextarea = document.getElementById(`draft-${draftId}`);
+    const editedDraft = draftTextarea.value;
+    
+    fetch(`/api/email/drafts/${draftId}/approve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            edited_draft: editedDraft
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Email sent successfully!', 'success');
+            removeDraftFromUI(draftId);
+            loadMetrics(); // Refresh metrics
+        } else {
+            showNotification('Failed to send email: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error approving draft:', error);
+        showNotification('Connection error. Please try again.', 'error');
+    });
+}
+
+function editDraft(draftId) {
+    const draftTextarea = document.getElementById(`draft-${draftId}`);
+    
+    // Enable editing and focus
+    draftTextarea.disabled = false;
+    draftTextarea.focus();
+    
+    // Change button text to indicate editing mode
+    const draftItem = document.querySelector(`[data-draft-id="${draftId}"]`);
+    const editBtn = draftItem.querySelector('.btn-secondary');
+    editBtn.innerHTML = '<i class="fas fa-save"></i> Ready to Send';
+    editBtn.onclick = () => approveDraft(draftId);
+}
+
+function rejectDraft(draftId) {
+    if (!confirm('Are you sure you want to reject this draft?')) {
+        return;
+    }
+    
+    fetch(`/api/email/drafts/${draftId}/reject`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Draft rejected', 'info');
+            removeDraftFromUI(draftId);
+        } else {
+            showNotification('Failed to reject draft: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error rejecting draft:', error);
+        showNotification('Connection error. Please try again.', 'error');
+    });
+}
+
+function removeDraftFromUI(draftId) {
+    const draftItem = document.querySelector(`[data-draft-id="${draftId}"]`);
+    if (draftItem) {
+        draftItem.remove();
+    }
+    
+    // Check if no drafts remain
+    const draftsContainer = document.getElementById('draftsContainer');
+    if (draftsContainer.children.length === 0) {
+        draftsContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-file-alt fa-2x"></i>
+                <p>No pending drafts. Process emails to generate responses.</p>
+            </div>
+        `;
+    }
+}
+
+// Load metrics and drafts on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadMetrics();
+    loadPendingDrafts();
+    
+    // Poll for drafts every 30 seconds
+    setInterval(loadPendingDrafts, 30000);
+});
+</script>
+{% endblock %}
