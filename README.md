@@ -2,6 +2,19 @@
 
 **Transform your business workflow with intelligent, AI-powered automation agents that handle emails, meetings, and contracts with enterprise-grade reliability.**
 
+
+
+
+<div align="center">
+  <a href="https://youtu.be/bFpYeQ4iHK0">
+    <img src="https://img.youtube.com/vi/bFpYeQ4iHK0/hqdefault.jpg" width="50%" alt="Watch video demo">
+  </a>
+</div>
+
+
+
+
+
 <div align="center">
 
 ![AgenticSuite Logo](https://img.shields.io/badge/AgenticSuite-AI%20Automation-blue?style=for-the-badge)
@@ -12,11 +25,7 @@
 </div>
 
 
-<div align="center">
-  <a href="https://youtu.be/bFpYeQ4iHK0">
-    <img src="https://img.youtube.com/vi/bFpYeQ4iHK0/hqdefault.jpg" width="50%" alt="Watch video demo">
-  </a>
-</div>
+
 
 
 
