@@ -12,7 +12,11 @@
 </div>
 
 
-[![Watch video demo](https://img.youtube.com/vi/bFpYeQ4iHK0/hqdefault.jpg)](https://youtu.be/bFpYeQ4iHK0)
+<div align="center">
+  <a href="https://youtu.be/bFpYeQ4iHK0">
+    <img src="https://img.youtube.com/vi/bFpYeQ4iHK0/hqdefault.jpg" width="50%" alt="Watch video demo">
+  </a>
+</div>
 
 
 
