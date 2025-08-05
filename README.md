@@ -11,6 +11,11 @@
 
 </div>
 
+
+[![Watch video demo](https://img.youtube.com/vi/bFpYeQ4iHK0/hqdefault.jpg)](https://youtu.be/bFpYeQ4iHK0)
+
+
+
 ## 🎯 **What is AgenticSuite?**
 
 AgenticSuite is a **state-of-the-art AI automation platform** that revolutionizes how organizations handle routine business tasks. Our intelligent agents work 24/7 to streamline your email management, automate meeting documentation, and provide enterprise-grade contract analysis—all while maintaining complete human oversight and control.
