@@ -4,7 +4,7 @@
 
 
 <div align="center">
-## ▶️ Demo Video:
+ ▶️ Watch video demo:
 </div>
 
 <div align="center">
